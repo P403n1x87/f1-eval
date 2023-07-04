@@ -71,8 +71,11 @@ class EvalRaceDataCollector(PacketHandler):
             }
 
         finished_drivers = sorted(
-            ((name, data["overall_time"]) for name, data in self.final_data.items()),
-            key=lambda _: _[1],
+            (
+                (name, data["position"], data["overall_time"])
+                for name, data in self.final_data.items()
+            ),
+            key=lambda _: _[0],
         )
 
         # with open(f"{self.session_type.lower()}_laps.csv", "w") as laps_file:
@@ -85,19 +88,47 @@ class EvalRaceDataCollector(PacketHandler):
         #             )
 
         with open(f"{self.session_type.lower()}_laps.csv", "w") as laps_file:
-            for i, (name, _) in enumerate(finished_drivers):
+            # Header
+            print(
+                ",".join(("pos", "name", "lap", "time_ms", "time")),
+                file=final_file,
+            )
+
+            for name, p, _ in finished_drivers:
                 laps = sorted(self.laps[name], key=lambda _: _[0])
                 for n, t in laps:
                     print(
-                        f"P{i+1},{name},{n},{t},{fmtt(t)}",
+                        f"P{p},{name},{n},{t},{fmtt(t)}",
                         file=laps_file,
                     )
 
         with open(f"{self.session_type.lower()}_result.csv", "w") as final_file:
-            for i, (name, _) in enumerate(finished_drivers):
+            # Header
+            print(
+                ",".join(("pos", "name", "best", "average", "sdev", "total", "pen")),
+                file=final_file,
+            )
+
+            for name, p, _ in finished_drivers:
                 result = self.final_data[name]
+                times = (t for _, t in self.laps[name])
+                avg = sum(times) / len(times)
+                sdev = (
+                    sum((t - avg) ** 2 for t in times) / len(times)
+                ) ** 0.5 / 1000  # in seconds
+
                 print(
-                    f"P{i+1},{name},{fmtt(result['best_lap'])}",
+                    ",".join(
+                        (
+                            f"P{p}",
+                            name,
+                            fmtt(result["best_lap"]),
+                            fmtt(avg),
+                            str(sdev),
+                            fmtt(result["overall_time"]),
+                            str(result["penalties_time"]),
+                        )
+                    ),
                     file=final_file,
                 )
 
@@ -110,8 +141,8 @@ class EvalRaceDataCollector(PacketHandler):
         #             file=final_file,
         #         )
 
-        print(self.laps)
-        print(self.final_data)
+        print(dict(self.laps))
+        print(dict(self.final_data))
 
     def handle_LapData(self, packet: PacketLapData):
         # get last lap time for each car
