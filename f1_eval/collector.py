@@ -3,13 +3,8 @@ from collections import defaultdict
 from datetime import timedelta
 
 from f1.handler import PacketHandler
-from f1.packets import (
-    SESSIONS,
-    PacketFinalClassificationData,
-    PacketLapData,
-    PacketParticipantsData,
-    PacketSessionData,
-)
+from f1.packets import (SESSIONS, PacketFinalClassificationData, PacketLapData,
+                        PacketParticipantsData, PacketSessionData)
 
 LapTime = t.Tuple[int, int]  # (lap number, lap time)
 
@@ -72,7 +67,7 @@ class EvalRaceDataCollector(PacketHandler):
                 (name, data["position"], data["overall_time"])
                 for name, data in self.final_data.items()
             ),
-            key=lambda _: _[0],
+            key=lambda _: _[1],
         )
 
         # with open(f"{self.session_type.lower()}_laps.csv", "w") as laps_file:
@@ -84,7 +79,7 @@ class EvalRaceDataCollector(PacketHandler):
         #                 file=laps_file,
         #             )
 
-        with open(f"{self._session_type}_laps.csv", "w") as laps_file:
+        with open(f"{self.session_type.lower()}_laps.csv", "w") as laps_file:
             # Header
             print(
                 ",".join(("pos", "name", "lap", "time_ms", "time")),
@@ -95,7 +90,7 @@ class EvalRaceDataCollector(PacketHandler):
                 laps = sorted(self.laps[name], key=lambda _: _[0])
                 for n, t in laps:
                     print(
-                        f"P{p},{name},{n},{t},{fmtt(t)}",
+                        f"{p},{name},{n},{t},{fmtt(t)}",
                         file=laps_file,
                     )
 
@@ -108,21 +103,23 @@ class EvalRaceDataCollector(PacketHandler):
 
             for name, p, _ in finished_drivers:
                 result = self.final_data[name]
-                times = (t for _, t in self.laps[name])
-                avg = sum(times) / len(times)
+                times = [t for _, t in self.laps[name]]
+                avg = (sum(times) / len(times)) if times else 0
                 sdev = (
-                    sum((t - avg) ** 2 for t in times) / len(times)
-                ) ** 0.5 / 1000  # in seconds
+                    ((sum((t - avg) ** 2 for t in times) / len(times)) ** 0.5 / 1000)
+                    if times
+                    else 0
+                )  # in seconds
 
                 print(
                     ",".join(
                         (
-                            f"P{p}",
+                            str(p),
                             name,
                             fmtt(result["best_lap"]),
                             fmtt(avg),
-                            str(sdev),
-                            fmtt(result["overall_time"]),
+                            f"{sdev:.2f}",
+                            fmtt(result["overall_time"] * 1000),
                             str(result["penalties_time"]),
                         )
                     ),
