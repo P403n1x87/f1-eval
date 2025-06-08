@@ -1,14 +1,15 @@
+import typing as t
 from collections import defaultdict
 from datetime import timedelta
+
 from f1.handler import PacketHandler
 from f1.packets import (
+    SESSIONS,
     PacketFinalClassificationData,
-    PacketSessionData,
-    PacketParticipantsData,
     PacketLapData,
+    PacketParticipantsData,
+    PacketSessionData,
 )
-import typing as t
-
 
 LapTime = t.Tuple[int, int]  # (lap number, lap time)
 
@@ -43,12 +44,8 @@ class EvalRaceDataCollector(PacketHandler):
             return
 
         # New session
-        if 1 <= packet.session_type <= 4:
-            self.session_type = "Practice"
-        elif 5 <= packet.session_type <= 9:
-            self.session_type = "Qualifying"
-        elif 10 <= packet.session_type <= 12:
-            self.session_type = "Race"
+        self.session_type = SESSIONS[packet.session_type]
+        self._session_type = self.session_type.lower().replace(" ", "_")
 
         print(self.session_type)
 
@@ -87,11 +84,11 @@ class EvalRaceDataCollector(PacketHandler):
         #                 file=laps_file,
         #             )
 
-        with open(f"{self.session_type.lower()}_laps.csv", "w") as laps_file:
+        with open(f"{self._session_type}_laps.csv", "w") as laps_file:
             # Header
             print(
                 ",".join(("pos", "name", "lap", "time_ms", "time")),
-                file=final_file,
+                file=laps_file,
             )
 
             for name, p, _ in finished_drivers:
@@ -102,7 +99,7 @@ class EvalRaceDataCollector(PacketHandler):
                         file=laps_file,
                     )
 
-        with open(f"{self.session_type.lower()}_result.csv", "w") as final_file:
+        with open(f"{self._session_type}_result.csv", "w") as final_file:
             # Header
             print(
                 ",".join(("pos", "name", "best", "average", "sdev", "total", "pen")),
